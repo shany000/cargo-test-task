@@ -140,34 +140,6 @@
             color: var(--sub);
         }
 
-        .center {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 14px;
-            text-align: center;
-        }
-
-        .okicon {
-            width: 72px;
-            height: 72px;
-            border-radius: 50%;
-            background: var(--ok-soft);
-            color: var(--ok);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 38px;
-            font-weight: 700;
-        }
-
-        .big {
-            font-size: 24px;
-            font-weight: 700;
-        }
-
         .note {
             border-left: 3px solid var(--brand);
             background: #fff;
@@ -175,6 +147,109 @@
             border-radius: 8px;
             font-size: 13px;
             color: #4b5563;
+        }
+
+        .price-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 12px 0;
+        }
+
+        .best-label {
+            color: var(--ok);
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .best-price {
+            background: var(--ok-soft);
+        }
+
+        .station-list,
+        .station-group,
+        .choice-list {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .station-group {
+            gap: 8px;
+        }
+
+        .group-title {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--sub);
+        }
+
+        .choice {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            padding: 18px 16px;
+            border: 1px solid #e3e6eb;
+            border-radius: 14px;
+            background: #fff;
+            color: var(--ink);
+            text-align: left;
+            font: inherit;
+            cursor: pointer;
+        }
+
+        .choice:disabled {
+            background: var(--bg);
+            color: var(--sub);
+            opacity: .7;
+            cursor: not-allowed;
+        }
+
+        .choice-info {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .choice-status {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .liters-input {
+            width: 100%;
+            padding: 16px;
+            margin: 10px 0;
+            border: 1px solid #d1d5db;
+            border-radius: 12px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .review-value {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+            text-align: right;
+            min-width: 0;
+        }
+
+        .edit-btn {
+            flex: none;
+            padding: 4px;
+            border: none;
+            background: none;
+            color: var(--brand);
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        [hidden] {
+            display: none !important;
         }
 
         @media (max-width: 430px) {
@@ -187,11 +262,232 @@
 
 <body>
     <main id="app" class="screen">
-        <div class="content">
+        <div class="status">
+            <span>9:41</span>
+            <span>▮▮▮ ▭</span>
+        </div>
+
+        <div id="content" class="content">
             <div class="title">Заправка в рейсе</div>
             <div class="muted">Загрузка приложения...</div>
         </div>
+
+        <div class="bottom">
+            <button id="bottom-button" class="btn" disabled>Загрузка...</button>
+        </div>
     </main>
+
+    <!-- Главный экран -->
+    <template id="home-screen">
+        <div class="title">Заправка в рейсе</div>
+
+        <div class="card">
+            <div class="muted">
+                Текущий рейс · <span data-field="date"></span>
+            </div>
+            <div class="route" data-field="route"></div>
+            <div class="muted" data-field="truck"></div>
+        </div>
+
+        <div class="card">
+            <div class="muted">Доступно на топливо</div>
+            <div class="limit" data-field="limit-left"></div>
+            <div class="muted">
+                из <span data-field="limit-total"></span>
+            </div>
+            <div class="progress">
+                <i data-field="progress"></i>
+            </div>
+        </div>
+    </template>
+
+    <!-- Выбор топлива -->
+    <template id="fuels-screen">
+        <div class="title">Выберите топливо</div>
+        <div class="muted">Доступное топливо в радиусе 30 км</div>
+        <div class="choice-list" data-list="fuels"></div>
+        <div class="note" data-field="empty" hidden></div>
+    </template>
+
+    <template id="fuel-option">
+        <button class="choice" data-action="fuel">
+            <div class="choice-info">
+                <strong data-field="name"></strong>
+                <span class="muted" data-field="details"></span>
+            </div>
+            <strong data-field="price"></strong>
+        </button>
+    </template>
+
+    <!-- Список АЗС -->
+    <template id="stations-screen">
+        <div class="title">Выберите АЗС</div>
+        <div class="muted">
+            <span data-field="fuel"></span> · станции в радиусе 30 км
+        </div>
+        <div class="station-list" data-list="stations"></div>
+        <div class="muted" data-field="empty"></div>
+    </template>
+
+    <!-- Карточка АЗС -->
+    <template id="station-card">
+        <div class="card">
+            <div class="muted" data-field="distance"></div>
+            <div class="route" data-field="name"></div>
+            <div class="muted" data-field="address"></div>
+
+            <div class="price-row">
+                <span class="muted" data-field="fuel-label"></span>
+                <strong data-field="price"></strong>
+            </div>
+
+            <div class="best-label" data-field="best-label" hidden>
+                Самая выгодная цена
+            </div>
+
+            <button class="btn" data-action="station">Выбрать АЗС</button>
+        </div>
+    </template>
+
+    <!-- Группа АЗС -->
+    <template id="station-group">
+        <div class="station-group">
+            <div class="group-title" data-field="title"></div>
+            <div class="station-list" data-list="stations"></div>
+        </div>
+    </template>
+
+    <!-- Выбор колонки -->
+    <template id="pumps-screen">
+        <div class="title">Выберите колонку</div>
+
+        <div class="card">
+            <div class="route" data-field="station"></div>
+            <div class="muted" data-field="address"></div>
+
+            <div class="summary row">
+                <span>Топливо</span>
+                <strong data-field="fuel"></strong>
+            </div>
+
+            <div class="summary row">
+                <span>Цена за литр</span>
+                <strong data-field="price"></strong>
+            </div>
+        </div>
+
+        <div class="choice-list" data-list="pumps"></div>
+        <div class="note" data-field="note" hidden></div>
+    </template>
+
+    <template id="pump-option">
+        <button class="choice" data-action="pump">
+            <div class="choice-info">
+                <strong data-field="name"></strong>
+                <span class="muted" data-field="fuels"></span>
+            </div>
+            <span class="choice-status" data-field="status"></span>
+        </button>
+    </template>
+
+    <!-- Ввод объёма -->
+    <template id="liters-screen">
+        <div class="title">Объём заправки</div>
+
+        <div class="card">
+            <div class="muted" data-field="station"></div>
+            <div class="route" data-field="fuel"></div>
+            <div class="muted" data-field="pump"></div>
+
+            <div class="summary row">
+                <span>Цена за литр</span>
+                <strong data-field="price"></strong>
+            </div>
+        </div>
+
+        <div class="card">
+            <label for="liters">Количество литров</label>
+            <input
+                id="liters"
+                class="liters-input"
+                data-field="liters"
+                type="number"
+                min="1"
+                step="1"
+                inputmode="decimal"
+            >
+
+            <div class="muted">
+                Ограничение АЗС: <span data-field="limits"></span>
+            </div>
+
+            <div class="summary row">
+                <span>Стоимость</span>
+                <strong data-field="total"></strong>
+            </div>
+
+            <div class="note" data-field="warning" hidden></div>
+        </div>
+    </template>
+
+    <!-- Проверка выбранных параметров -->
+    <template id="review-screen">
+        <div class="title">Проверьте выбор</div>
+
+        <div class="card summary">
+            <div class="row">
+                <span>АЗС</span>
+                <div class="review-value">
+                    <strong data-field="station"></strong>
+                    <button class="edit-btn" data-action="edit-station">Изменить</button>
+                </div>
+            </div>
+
+            <div class="row">
+                <span>Топливо</span>
+                <div class="review-value">
+                    <strong data-field="fuel"></strong>
+                    <button class="edit-btn" data-action="edit-fuel">Изменить</button>
+                </div>
+            </div>
+
+            <div class="row">
+                <span>Колонка</span>
+                <div class="review-value">
+                    <strong data-field="pump"></strong>
+                    <button class="edit-btn" data-action="edit-pump">Изменить</button>
+                </div>
+            </div>
+
+            <div class="row">
+                <span>Объём</span>
+                <div class="review-value">
+                    <strong data-field="liters"></strong>
+                    <button class="edit-btn" data-action="edit-liters">Изменить</button>
+                </div>
+            </div>
+
+            <div class="row">
+                <span>Цена за литр</span>
+                <strong data-field="price"></strong>
+            </div>
+
+            <div class="row">
+                <span>Стоимость</span>
+                <strong data-field="total"></strong>
+            </div>
+        </div>
+
+        <div class="note">
+            Параметры выбраны. Заказ ещё не отправлен.
+        </div>
+    </template>
+
+    <!-- Загрузка и ошибки -->
+    <template id="message-screen">
+        <div class="title" data-field="title"></div>
+        <div class="note" data-field="message"></div>
+    </template>
 
     <script src="fake-api.js"></script>
     <script src="app.js"></script>
