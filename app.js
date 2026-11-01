@@ -7,6 +7,7 @@ const bottomButton = document.getElementById('bottom-button');
 const PENDING_KEY = 'zapravka.pendingFueling';
 let pollTimer = null;
 let polling = false;
+let cancelRequested = false;
 
 function readPending() {
     try {
@@ -380,9 +381,23 @@ function renderFueling() {
         fueling: 'Заправка выполняется. Статус обновляется автоматически.'
     };
 
-    setField(screen, 'note', state.pollError || notes[f.status] || '');
-    screen.querySelector('[data-action="cancel"]').hidden =
+    const note = state.pollError ||
+        (cancelRequested
+            ? 'Запрос на отмену будет отправлен после проверки текущего статуса.'
+            : notes[f.status] || '');
+
+    setField(screen, 'note', note);
+
+    const cancelButton = screen.querySelector('[data-action="cancel"]');
+    cancelButton.hidden =
         !['accepted', 'waiting_nozzle'].includes(f.status);
+    cancelButton.disabled = cancelRequested;
+
+    if (cancelRequested) {
+        cancelButton.textContent = 'Ожидание проверки статуса';
+    } else {
+        cancelButton.textContent = 'Отменить заправку';
+    }
 }
 
 function renderResult() {
@@ -428,7 +443,9 @@ function render() {
             liters: 'Объём заправки',
             review: 'Проверка выбора',
             sending: 'Отправка заказа',
-            fueling: 'Заправка'
+            fueling: 'Заправка',
+            recovery: 'Проверка активной заправки',
+            settlement: 'Обновление лимита'
         };
 
         setField(screen, 'title', titles[state.page]);
@@ -561,13 +578,32 @@ function isFinished() {
 
 async function finishFueling() {
     clearTimeout(pollTimer);
+    cancelRequested = false;
+
+    if (state.loading) return;
+
+    state.page = 'settlement';
+    state.loading = true;
+    state.error = '';
+    state.retry = finishFueling;
+    render();
 
     try {
         state.trip = await FakeApi.getTrip();
-    } catch {}
 
-    state.page = 'result';
-    render();
+        state.loading = false;
+        state.error = '';
+        state.retry = null;
+        state.page = 'result';
+        render();
+    } catch {
+        state.loading = false;
+        state.page = 'settlement';
+        state.error =
+            'Заправка завершена, но не удалось обновить остаток лимита. Повторите запрос.';
+        state.retry = finishFueling;
+        render();
+    }
 }
 
 function schedulePolling() {
@@ -579,7 +615,7 @@ function schedulePolling() {
 }
 
 async function refreshFueling() {
-    if (polling || !state.fueling?.id) return;
+    if (polling || state.loading || !state.fueling?.id) return;
 
     clearTimeout(pollTimer);
     polling = true;
@@ -595,6 +631,9 @@ async function refreshFueling() {
 
     if (isFinished()) {
         await finishFueling();
+    } else if (cancelRequested) {
+        cancelRequested = false;
+        await cancelFueling();
     } else {
         render();
         schedulePolling();
@@ -653,6 +692,33 @@ async function submitFueling() {
             state.pump = null;
             state.notice = 'Колонка стала недоступна. Выберите другую.';
             state.page = 'pumps';
+        } else if (e.code === 'FUEL_NOT_AVAILABLE') {
+            const pump = state.station.pumps.find(
+                p => p.number === state.pending.request.pump
+            );
+
+            if (pump) {
+                pump.fuels = pump.fuels.filter(
+                    fuel => fuel !== state.pending.request.fuel
+                );
+            }
+
+            clearPending();
+            state.pump = null;
+            state.notice = 'На выбранной колонке нет выбранного топлива. Выберите другую колонку.';
+            state.page = 'pumps';
+        } else if (e.code === 'INVALID_LITERS') {
+            if (Number.isFinite(e.details?.min)) {
+                state.station.litersMin = e.details.min;
+            }
+
+            if (Number.isFinite(e.details?.max)) {
+                state.station.litersMax = e.details.max;
+            }
+
+            clearPending();
+            state.notice = e.message || 'АЗС отклонила указанный объём. Проверьте ограничения.';
+            state.page = 'liters';
         } else if (e.code === 'LIMIT_EXCEEDED') {
             if (Number.isFinite(e.details?.available)) {
                 state.trip.limitLeft = e.details.available;
@@ -671,10 +737,33 @@ async function submitFueling() {
 }
 
 async function cancelFueling() {
-    if (state.loading || polling) return;
+    if (state.loading) return;
 
+    if (polling) {
+        cancelRequested = true;
+        render();
+        return;
+    }
+
+    if (!state.fueling?.id) return;
+
+    if (isFinished()) {
+        await finishFueling();
+        return;
+    }
+
+    if (!['accepted', 'waiting_nozzle'].includes(state.fueling.status)) {
+        state.pollError = 'Заправка уже началась. Отмена недоступна.';
+        render();
+        schedulePolling();
+        return;
+    }
+
+    clearTimeout(pollTimer);
+    cancelRequested = false;
     state.loading = true;
     state.page = 'fueling';
+    state.error = '';
     state.retry = cancelFueling;
     render();
 
@@ -697,10 +786,19 @@ async function cancelFueling() {
 }
 
 async function restoreOrder() {
+    if (state.loading) return;
+
+    state.page = 'recovery';
+    state.loading = true;
+    state.error = '';
+    state.retry = restoreOrder;
+    render();
+
     if (state.pending) {
         restorePending();
 
         if (state.pending.priceChanged) {
+            state.loading = false;
             state.page = 'review';
             render();
             return;
@@ -710,13 +808,15 @@ async function restoreOrder() {
             try {
                 state.fueling = await FakeApi.getFueling(state.pending.fuelingId);
             } catch {
-                state.page = 'sending';
-                state.error = 'Не удалось восстановить заказ. Повторите запрос.';
+                state.loading = false;
+                state.page = 'recovery';
+                state.error = 'Не удалось восстановить заказ. Проверьте соединение и повторите запрос.';
                 state.retry = restoreOrder;
                 render();
                 return;
             }
         } else {
+            state.loading = false;
             await submitFueling();
             return;
         }
@@ -724,14 +824,29 @@ async function restoreOrder() {
         try {
             state.fueling = await FakeApi.getActiveFueling();
         } catch {
+            state.loading = false;
+            state.page = 'recovery';
+            state.error = 'Не удалось проверить наличие активной заправки. Проверьте соединение и повторите запрос.';
+            state.retry = restoreOrder;
+            render();
             return;
         }
 
-        if (!state.fueling) return;
+        if (!state.fueling) {
+            state.loading = false;
+            state.page = 'home';
+            state.error = '';
+            state.retry = null;
+            render();
+            return;
+        }
 
         state.pending = { fuelingId: state.fueling.id };
         savePending();
     }
+
+    state.loading = false;
+    state.error = '';
 
     if (isFinished()) {
         await finishFueling();
@@ -846,6 +961,7 @@ app.addEventListener('click', e => {
 
     if (action === 'new-fueling') {
         clearTimeout(pollTimer);
+        cancelRequested = false;
         clearPending();
 
         state.fueling = null;
