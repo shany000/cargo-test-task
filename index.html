@@ -123,6 +123,12 @@
             cursor: not-allowed;
         }
 
+        .btn-cancel {
+            background: #fff;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+
         .bottom {
             padding: 12px 24px 24px;
             flex: none;
@@ -430,7 +436,7 @@
         </div>
     </template>
 
-    <!-- Проверка выбранных параметров -->
+    <!-- Проверка заказа -->
     <template id="review-screen">
         <div class="title">Проверьте выбор</div>
 
@@ -478,8 +484,84 @@
             </div>
         </div>
 
-        <div class="note">
-            Параметры выбраны. Заказ ещё не отправлен.
+        <div class="note" data-field="review-note"></div>
+    </template>
+
+    <!-- Выполнение заправки -->
+    <template id="fueling-screen">
+        <div class="title">Заправка</div>
+
+        <div class="card">
+            <div class="route" data-field="status"></div>
+            <div class="muted" data-field="station"></div>
+
+            <div class="summary row">
+                <span>Топливо</span>
+                <strong data-field="fuel"></strong>
+            </div>
+
+            <div class="summary row">
+                <span>Колонка</span>
+                <strong data-field="pump"></strong>
+            </div>
+
+            <div class="summary row">
+                <span>Заказано</span>
+                <strong data-field="liters"></strong>
+            </div>
+
+            <div class="summary row">
+                <span>Залито</span>
+                <strong data-field="current"></strong>
+            </div>
+
+            <div class="progress">
+                <i data-field="progress"></i>
+            </div>
+
+            <div class="summary row">
+                <span>Цена за литр</span>
+                <strong data-field="price"></strong>
+            </div>
+
+            <div class="summary row">
+                <span>Холд</span>
+                <strong data-field="amount"></strong>
+            </div>
+        </div>
+
+        <div class="note" data-field="note"></div>
+
+        <button class="btn btn-cancel" data-action="cancel">
+            Отменить заправку
+        </button>
+    </template>
+
+    <!-- Результат -->
+    <template id="result-screen">
+        <div class="title" data-field="title"></div>
+        <div class="note" data-field="message"></div>
+
+        <div class="card summary">
+            <div class="row">
+                <span>Фактически залито</span>
+                <strong data-field="liters"></strong>
+            </div>
+
+            <div class="row">
+                <span>Цена за литр</span>
+                <strong data-field="price"></strong>
+            </div>
+
+            <div class="row">
+                <span>Списано</span>
+                <strong data-field="amount"></strong>
+            </div>
+
+            <div class="row">
+                <span>Остаток лимита</span>
+                <strong data-field="limit"></strong>
+            </div>
         </div>
     </template>
 
